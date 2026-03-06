@@ -1,12 +1,36 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { IncomingForm } from 'formidable'
-import fs from 'fs'
 import { prisma } from '@/lib/prisma'
 
 export const config = {
   api: {
     bodyParser: false,
+    responseLimit: false,
   },
+}
+
+function getRawBody(req: NextApiRequest): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    req.on('data', (chunk: Buffer) => chunks.push(chunk))
+    req.on('end', () => resolve(Buffer.concat(chunks)))
+    req.on('error', reject)
+  })
+}
+
+function parseMultipart(buffer: Buffer, boundary: string): Buffer | null {
+  const boundaryBuffer = Buffer.from('--' + boundary)
+  const start = buffer.indexOf(boundaryBuffer)
+  if (start === -1) return null
+
+  const headerEnd = buffer.indexOf(Buffer.from('\r\n\r\n'), start)
+  if (headerEnd === -1) return null
+
+  const contentStart = headerEnd + 4
+
+  const endBoundary = buffer.indexOf(boundaryBuffer, contentStart)
+  if (endBoundary === -1) return null
+
+  return buffer.subarray(contentStart, endBoundary - 2)
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -15,30 +39,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const form = new IncomingForm({ maxFileSize: 50 * 1024 * 1024 })
+    const rawBody = await getRawBody(req)
 
-    const [, files] = await new Promise<[Record<string, unknown>, Record<string, unknown>]>((resolve, reject) => {
-      form.parse(req, (err, fields, files) => {
-        if (err) reject(err)
-        else resolve([fields, files])
-      })
-    })
-
-    const fileEntry = files.file
-    const uploadedFile = (Array.isArray(fileEntry) ? fileEntry[0] : fileEntry) as {
-      filepath: string
-      originalFilename: string | null
-      size: number
-    } | undefined
-
-    if (!uploadedFile) {
-      return res.status(400).json({ error: 'No file uploaded' })
+    const contentType = req.headers['content-type'] || ''
+    const boundaryMatch = contentType.match(/boundary=(.+)/)
+    if (!boundaryMatch) {
+      return res.status(400).json({ error: 'No boundary found in content-type' })
     }
 
-    const buffer = fs.readFileSync(uploadedFile.filepath)
+    const pdfBuffer = parseMultipart(rawBody, boundaryMatch[1])
+    if (!pdfBuffer) {
+      return res.status(400).json({ error: 'Could not extract file from upload' })
+    }
 
     const pdfParse = require('pdf-parse')
-    const pdfData = await pdfParse(buffer)
+    const pdfData = await pdfParse(pdfBuffer)
     const text: string = pdfData.text
 
     const scripts: { title: string; content: string; adSetName: string; scriptNumber: string }[] = []
@@ -106,9 +121,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const adSets = [...new Set(scripts.map(s => s.adSetName))]
-
-    fs.unlinkSync(uploadedFile.filepath)
-
     return res.status(200).json({ success: true, count: scripts.length, adSets })
   } catch (error: unknown) {
     console.error('Upload error:', error)
