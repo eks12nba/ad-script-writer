@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 interface ParsedScript {
   title: string
@@ -139,7 +140,7 @@ function parseScriptsFromText(text: string): ParsedScript[] {
   return scripts
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser()
     if (!user.isAdmin) {
@@ -149,17 +150,20 @@ export async function POST(request: Request) {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
 
-    if (!file || !file.name.endsWith('.pdf')) {
+    if (!file) {
+      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
+    }
+
+    if (!file.name.endsWith('.pdf')) {
       return NextResponse.json({ error: 'Please upload a PDF file' }, { status: 400 })
     }
 
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
+    const bytes = await file.arrayBuffer()
+    const buffer = Buffer.from(bytes)
 
-    // Dynamic import to avoid pdf-parse test file bug at build time
-    const pdfParse = (await import('pdf-parse')).default
-    const pdfData = await pdfParse(buffer)
-    const text = pdfData.text
+    const pdfParse = require('pdf-parse')
+    const data = await pdfParse(buffer)
+    const text = data.text
 
     const scripts = parseScriptsFromText(text)
 
@@ -184,9 +188,9 @@ export async function POST(request: Request) {
       count: scripts.length,
       adSets,
     })
-  } catch (err) {
-    console.error('Upload error:', err)
-    const message = err instanceof Error ? err.message : 'Upload failed'
+  } catch (error: unknown) {
+    console.error('Upload error:', error)
+    const message = error instanceof Error ? error.message : 'Upload failed'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
