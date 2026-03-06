@@ -12,7 +12,7 @@ import StatusDot from '@/components/ui/StatusDot'
 
 function HomeContent() {
   const searchParams = useSearchParams()
-  const forceWelcome = searchParams.get('welcome') === 'true'
+  const forceWelcome = searchParams?.get('welcome') === 'true'
 
   const [showLoading, setShowLoading] = useState(true)
   const [checkingProfile, setCheckingProfile] = useState(true)

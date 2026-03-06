@@ -64,7 +64,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <nav className="flex-1 px-2 py-4 space-y-1">
         {navItems.map((item) => {
-          const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
+          const isActive = item.href === '/' ? pathname === '/' : pathname?.startsWith(item.href)
           const Icon = item.icon
           return (
             <Link
