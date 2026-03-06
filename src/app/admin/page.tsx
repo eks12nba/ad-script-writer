@@ -25,6 +25,7 @@ export default function AdminPage() {
   const [samples, setSamples] = useState<SampleScript[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState('')
   const [uploadResult, setUploadResult] = useState<{ count: number; adSets: string[] } | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [isClearing, setIsClearing] = useState(false)
@@ -53,25 +54,57 @@ export default function AdminPage() {
     setIsUploading(true)
     setUploadResult(null)
     setUploadError(null)
+    setUploadProgress('Reading file...')
 
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const res = await fetch('/api/upload-scripts', {
-        method: 'POST',
-        body: formData,
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = reader.result as string
+          resolve(result.split(',')[1])
+        }
+        reader.onerror = () => reject(new Error('Failed to read file'))
+        reader.readAsDataURL(file)
       })
-      const data = await res.json()
-      if (res.ok) {
-        setUploadResult({ count: data.count, adSets: data.adSets })
-        loadStats()
-      } else {
-        setUploadError(data.error || 'Upload failed')
+
+      const CHUNK_SIZE = 500 * 1024
+      const chunks: string[] = []
+      for (let i = 0; i < base64.length; i += CHUNK_SIZE) {
+        chunks.push(base64.slice(i, i + CHUNK_SIZE))
       }
-    } catch {
-      setUploadError('Upload failed')
+
+      const uploadId = Math.random().toString(36).substring(2, 10)
+
+      for (let i = 0; i < chunks.length; i++) {
+        setUploadProgress(`Uploading chunk ${i + 1} of ${chunks.length}...`)
+
+        const res = await fetch('/api/admin/upload-chunk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chunkIndex: i,
+            totalChunks: chunks.length,
+            chunkData: chunks[i],
+            uploadId,
+          }),
+        })
+
+        const data = await res.json()
+
+        if (!data.success) {
+          throw new Error(data.error || 'Upload failed')
+        }
+
+        if (data.done) {
+          setUploadProgress('')
+          setUploadResult({ count: data.count, adSets: data.adSets })
+          loadStats()
+        }
+      }
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed')
     } finally {
+      setUploadProgress('')
       setIsUploading(false)
     }
   }
@@ -216,7 +249,9 @@ export default function AdminPage() {
                     <circle cx="12" cy="12" r="10" opacity="0.25" />
                     <path d="M12 2a10 10 0 0 1 10 10" opacity="0.75" />
                   </svg>
-                  <p className="text-[14px]" style={{ color: '#A1A1B5' }}>Parsing PDF and extracting scripts...</p>
+                  <p className="text-[14px]" style={{ color: '#A1A1B5' }}>
+                    {uploadProgress || 'Processing PDF...'}
+                  </p>
                 </>
               ) : (
                 <>
