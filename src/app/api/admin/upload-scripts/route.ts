@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/auth'
+import { verifyToken } from '@clerk/backend'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
@@ -142,8 +142,22 @@ function parseScriptsFromText(text: string): ParsedScript[] {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getCurrentUser()
-    if (!user.isAdmin) {
+    // Manual auth: verify Clerk session token from cookie (middleware is bypassed for this route)
+    const token = request.cookies.get('__session')?.value
+    if (!token) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    const payload = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY!,
+    })
+    const clerkId = payload.sub
+    if (!clerkId) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    const user = await prisma.user.findUnique({ where: { clerkId } })
+    if (!user?.isAdmin) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
     }
 
