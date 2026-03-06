@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0C0C10;
+  --surface: #141419;
+  --surface-alt: #1A1A22;
+  --card: #1E1E28;
+  --card-border: #2A2A3A;
+  --card-hover: #25253A;
+  --purple: #8B5CF6;
+  --purple-glow: rgba(139, 92, 246, 0.25);
+  --green: #22C55E;
+  --red: #EF4444;
+  --blue: #3B82F6;
+  --gray: #6B7280;
+  --gold: #F59E0B;
+  --text: #F1F1F5;
+  --text-muted: #A1A1B5;
+  --text-dim: #6B6B80;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-alt: var(--surface-alt);
+  --color-card: var(--card);
+  --color-card-border: var(--card-border);
+  --color-card-hover: var(--card-hover);
+  --color-purple: var(--purple);
+  --color-purple-glow: var(--purple-glow);
+  --color-green: var(--green);
+  --color-red: var(--red);
+  --color-blue: var(--blue);
+  --color-gray: var(--gray);
+  --color-gold: var(--gold);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-dim: var(--text-dim);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
