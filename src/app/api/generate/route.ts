@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Please complete onboarding first' }, { status: 400 })
     }
 
-    const { systemPrompt, userMessage } = buildPrompt({
+    const { systemPrompt, userMessage } = await buildPrompt({
       framework,
       userProfile: profile,
       overrides,

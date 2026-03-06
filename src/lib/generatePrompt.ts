@@ -1,3 +1,5 @@
+import { getRandomScripts } from '@/lib/getRandomScripts'
+
 interface Framework {
   name: string
   structure: string
@@ -44,7 +46,7 @@ function formatList(items: string[]): string {
   return items.map((item, i) => `${i + 1}. ${item}`).join('\n')
 }
 
-export function buildPrompt(input: PromptInput): { systemPrompt: string; userMessage: string } {
+export async function buildPrompt(input: PromptInput): Promise<{ systemPrompt: string; userMessage: string }> {
   const { framework, userProfile, overrides, selectedAvatar, numberOfScripts } = input
   const profile = { ...userProfile, ...overrides }
 
@@ -77,6 +79,33 @@ ${framework.toneGuidance || 'Conversational, spoken-aloud, real. Not corporate. 
 
   if (fullExamples.length > 0) {
     systemPrompt += `\n\nFULL PROVEN SCRIPTS (these are real scripts that generated results — study the rhythm, tone, specificity, and flow. Your scripts should feel like they belong in this collection):\n${fullExamples.map((ex, i) => `--- Script ${i + 1} ---\n${ex}`).join('\n\n')}`
+  }
+
+  // Inject random proven scripts from the library
+  try {
+    let libraryScripts = await getRandomScripts(10)
+
+    if (libraryScripts.length > 0) {
+      // Enforce ~40k char budget
+      const MAX_CHARS = 40000
+      let totalChars = libraryScripts.reduce((sum, s) => sum + s.content.length, 0)
+      while (totalChars > MAX_CHARS && libraryScripts.length > 1) {
+        libraryScripts = libraryScripts.slice(0, -1)
+        totalChars = libraryScripts.reduce((sum, s) => sum + s.content.length, 0)
+      }
+
+      const scriptBlocks = libraryScripts.map((s) => {
+        const label = s.title || `Script from ${s.adSetName || 'Library'}`
+        return `--- PROVEN SCRIPT: ${label} ---\n${s.content}\n--- END SCRIPT ---`
+      }).join('\n\n')
+
+      systemPrompt += `\n\n=== PROVEN SCRIPT LIBRARY ===
+Below are real ad scripts written by our agency that have generated results for real clients. Study these carefully. Your scripts should match this level of quality, specificity, and conversational tone. These are the GOLD STANDARD — your output should feel like it belongs alongside these.
+
+${scriptBlocks}`
+    }
+  } catch {
+    // If library fetch fails, continue without examples
   }
 
   systemPrompt += `
@@ -117,6 +146,17 @@ VARIETY:
 - Each script must use a genuinely DIFFERENT angle
 - Different openings, structures, energy, arguments
 - Reading all scripts back to back should NOT feel repetitive
+
+CRITICAL: Your scripts must match the tone, rhythm, and style of the proven scripts above. Notice how they:
+- Use short, punchy sentences that flow naturally when spoken aloud
+- Get hyper-specific about the avatar's daily reality and pain points
+- Use real numbers, real results, real case studies — never vague claims
+- Build momentum through the body with escalating proof and value
+- Sound like a real person having a conversation, not a marketer reading copy
+- Use casual transitions and natural speech patterns
+- Never use corporate jargon or AI-sounding language
+
+Your scripts should be INDISTINGUISHABLE from the proven scripts above. If someone read your scripts mixed in with the proven ones, they should not be able to tell which is which.
 
 OUTPUT FORMAT:
 Return ONLY a JSON array. No markdown, no backticks, no explanation. Each element:

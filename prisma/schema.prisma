@@ -111,3 +111,13 @@ model Folder {
   scripts         GeneratedScript[]
   createdAt       DateTime @default(now())
 }
+
+model ScriptLibrary {
+  id              String   @id @default(cuid())
+  title           String?
+  angle           String?  @db.Text
+  content         String   @db.Text
+  adSetName       String?
+  scriptNumber    String?
+  createdAt       DateTime @default(now())
+}
