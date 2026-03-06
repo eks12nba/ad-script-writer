@@ -16,8 +16,11 @@ const pressStart2P = Press_Start_2P({
 })
 
 export const metadata: Metadata = {
-  title: 'Script Engine',
-  description: 'AI-powered ad script writer',
+  title: 'Ad Script Writer',
+  description: 'AI-powered ad script writer by Sell More Online',
+  icons: {
+    icon: '/favicon.png',
+  },
 }
 
 export default function RootLayout({

@@ -32,31 +32,32 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const sidebarContent = (
     <>
       <div className="p-4 pb-2">
-        <div
-          className="flex items-center gap-2"
-          style={{ fontFamily: 'var(--font-press-start)' }}
-        >
+        <div className="flex flex-col items-start gap-1.5">
           {!collapsed && (
-            <span
-              className="text-[10px] tracking-wider"
-              style={{
-                color: '#8B5CF6',
-                textShadow: '0 0 10px rgba(139,92,246,0.5)',
-              }}
-            >
-              SCRIPT ENGINE
-            </span>
+            <>
+              <img
+                src="/logo.png"
+                alt="Logo"
+                style={{ height: '40px', width: 'auto' }}
+              />
+              <span
+                className="text-[9px] tracking-wider"
+                style={{
+                  fontFamily: 'var(--font-press-start)',
+                  color: '#8B5CF6',
+                  textShadow: '0 0 10px rgba(139,92,246,0.5)',
+                }}
+              >
+                SCRIPT ENGINE
+              </span>
+            </>
           )}
           {collapsed && (
-            <span
-              className="text-[10px]"
-              style={{
-                color: '#8B5CF6',
-                textShadow: '0 0 10px rgba(139,92,246,0.5)',
-              }}
-            >
-              SE
-            </span>
+            <img
+              src="/logo.png"
+              alt="Logo"
+              style={{ height: '28px', width: 'auto' }}
+            />
           )}
         </div>
       </div>
@@ -123,7 +124,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen" style={{ backgroundColor: '#0C0C10' }}>
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/60 md:hidden"
@@ -131,7 +131,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* Mobile sidebar */}
       <aside
         className="fixed inset-y-0 left-0 z-50 flex flex-col md:hidden transition-transform duration-200"
         style={{
@@ -149,7 +148,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {sidebarContent}
       </aside>
 
-      {/* Desktop sidebar */}
       <aside
         className="hidden md:flex flex-col flex-shrink-0 transition-all duration-200"
         style={{
@@ -161,7 +159,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {sidebarContent}
       </aside>
 
-      {/* Main content */}
       <main className="flex-1 overflow-y-auto">
         <div className="md:hidden p-4">
           <button onClick={() => setMobileOpen(true)} style={{ color: '#A1A1B5' }}>
