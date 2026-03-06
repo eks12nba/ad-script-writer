@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id              String   @id @default(cuid())
+  clerkId         String   @unique
+  email           String   @unique
+  name            String?
+  isAdmin         Boolean  @default(false)
+  hasOnboarded    Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  profile         UserProfile?
+  scripts         GeneratedScript[]
+  folders         Folder[]
+  generations     Generation[]
+}
+
+model UserProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  serviceName         String?
+  tangibleService     String?  @db.Text
+  directOutcome       String?  @db.Text
+  benefitsOfOutcome   String?  @db.Text
+  differentiators     String?  @db.Text
+  caseStudies         String?  @db.Text
+  impliedAuthority    String?  @db.Text
+  coreOutcome         String?  @db.Text
+  avatars             String?  @db.Text
+  bigOpportunities    String?  @db.Text
+  deliverablesList    String?  @db.Text
+  clientProcess       String?  @db.Text
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model Framework {
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  description     String   @db.Text
+  structure       String   @db.Text
+  toneGuidance    String?  @db.Text
+  exampleHooks    String?  @db.Text
+  exampleBodies   String?  @db.Text
+  exampleCTAs     String?  @db.Text
+  fullExamples    String?  @db.Text
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  generations     Generation[]
+}
+
+model Generation {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  frameworkId     String
+  framework       Framework @relation(fields: [frameworkId], references: [id])
+
+  inputData       String   @db.Text
+  scriptsGenerated Int     @default(0)
+
+  scripts         GeneratedScript[]
+  createdAt       DateTime @default(now())
+}
+
+model GeneratedScript {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generationId    String?
+  generation      Generation? @relation(fields: [generationId], references: [id])
+  folderId        String?
+  folder          Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  title           String
+  hook            String   @db.Text
+  body            String   @db.Text
+  cta             String   @db.Text
+  fullScript      String   @db.Text
+  frameworkName   String
+  tags            String?
+  isFavorite      Boolean  @default(false)
+  notes           String?  @db.Text
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Folder {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  color           String?  @default("#8B5CF6")
+  scripts         GeneratedScript[]
+  createdAt       DateTime @default(now())
+}
