@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+export const runtime = 'nodejs'
+
 interface ParsedScript {
   title: string
   content: string
