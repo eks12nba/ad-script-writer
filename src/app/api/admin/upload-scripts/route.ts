@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyToken } from '@clerk/backend'
+import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 interface ParsedScript {
   title: string
@@ -18,12 +19,10 @@ function parseScriptsFromText(text: string): ParsedScript[] {
   let currentAdSet = 'Unknown Ad Set'
   let currentScript: ParsedScript | null = null
 
-  // Patterns
   const adSetPattern = /ad\s*set/i
   const scriptMarkerPattern = /^Ad\s*(Script\s*)?\d+/i
   const scriptMarkerFull = /^Ad\s*(Script\s*)?(\d+)\s*[–\-:]?\s*(.*)/i
 
-  // Copyright and filming instruction patterns to strip
   const copyrightPattern = /©\s*Sell\s*More\s*Online/i
   const filmingPatterns = [
     /^Film\s+these\s+vertical/i,
@@ -49,25 +48,21 @@ function parseScriptsFromText(text: string): ParsedScript[] {
     for (const line of contentLines) {
       if (skipRest) break
 
-      // Stop at copyright
       if (copyrightPattern.test(line)) {
         skipRest = true
         continue
       }
 
-      // Detect filming instruction blocks
       if (isFilmingInstruction(line)) {
         inFilmingBlock = true
         continue
       }
 
-      // If in filming block, skip bullet points and short lines that are part of instructions
       if (inFilmingBlock) {
         const trimmed = line.trim()
         if (trimmed.startsWith('-') || trimmed.startsWith('•') || trimmed === '') {
           continue
         }
-        // If we hit a substantial line that's not a bullet, end the filming block
         if (trimmed.length > 50) {
           inFilmingBlock = false
         } else {
@@ -85,9 +80,7 @@ function parseScriptsFromText(text: string): ParsedScript[] {
     const line = lines[i].trim()
     if (!line) continue
 
-    // Check for ad set header
     if (adSetPattern.test(line) && !scriptMarkerPattern.test(line)) {
-      // Save current script if any
       if (currentScript && currentScript.content.trim()) {
         currentScript.content = cleanContent(currentScript.content)
         if (currentScript.content.length >= 100) {
@@ -99,10 +92,8 @@ function parseScriptsFromText(text: string): ParsedScript[] {
       continue
     }
 
-    // Check for script marker
     const match = line.match(scriptMarkerFull)
     if (match) {
-      // Save previous script
       if (currentScript && currentScript.content.trim()) {
         currentScript.content = cleanContent(currentScript.content)
         if (currentScript.content.length >= 100) {
@@ -123,13 +114,11 @@ function parseScriptsFromText(text: string): ParsedScript[] {
       continue
     }
 
-    // Accumulate content into current script
     if (currentScript) {
       currentScript.content += line + '\n'
     }
   }
 
-  // Don't forget the last script
   if (currentScript && currentScript.content.trim()) {
     currentScript.content = cleanContent(currentScript.content)
     if (currentScript.content.length >= 100) {
@@ -142,42 +131,27 @@ function parseScriptsFromText(text: string): ParsedScript[] {
 
 export async function POST(request: NextRequest) {
   try {
-    // Manual auth: verify Clerk session token from cookie (middleware is bypassed for this route)
-    const token = request.cookies.get('__session')?.value
-    if (!token) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    }
-
-    const payload = await verifyToken(token, {
-      secretKey: process.env.CLERK_SECRET_KEY!,
-    })
-    const clerkId = payload.sub
-    if (!clerkId) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({ where: { clerkId } })
-    if (!user?.isAdmin) {
+    const user = await getCurrentUser()
+    if (!user.isAdmin) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
     }
 
-    const formData = await request.formData()
-    const file = formData.get('file') as File | null
+    const body = await request.json()
+    const { fileData, fileName } = body
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
+    if (!fileData) {
+      return NextResponse.json({ error: 'No file data provided' }, { status: 400 })
     }
 
-    if (!file.name.endsWith('.pdf')) {
+    if (fileName && !fileName.endsWith('.pdf')) {
       return NextResponse.json({ error: 'Please upload a PDF file' }, { status: 400 })
     }
 
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
+    const buffer = Buffer.from(fileData, 'base64')
 
     const pdfParse = require('pdf-parse')
-    const data = await pdfParse(buffer)
-    const text = data.text
+    const pdfData = await pdfParse(buffer)
+    const text = pdfData.text
 
     const scripts = parseScriptsFromText(text)
 
@@ -185,7 +159,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No scripts found in the PDF' }, { status: 400 })
     }
 
-    // Bulk insert
     await prisma.scriptLibrary.createMany({
       data: scripts.map((s) => ({
         title: s.title,

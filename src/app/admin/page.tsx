@@ -54,13 +54,22 @@ export default function AdminPage() {
     setUploadResult(null)
     setUploadError(null)
 
-    const formData = new FormData()
-    formData.append('file', file)
-
     try {
+      // Convert PDF to base64 to avoid FormData/multipart issues with Next.js 16
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = reader.result as string
+          resolve(result.split(',')[1])
+        }
+        reader.onerror = () => reject(new Error('Failed to read file'))
+        reader.readAsDataURL(file)
+      })
+
       const res = await fetch('/api/admin/upload-scripts', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, fileData: base64Data }),
       })
       const data = await res.json()
       if (res.ok) {
